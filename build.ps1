@@ -75,3 +75,13 @@ if (-not (Test-Path -LiteralPath $ks)) {
 if ($LASTEXITCODE -ne 0) { throw "签名失败" }
 
 Get-Item -LiteralPath $APK | Select-Object Name, Length
+
+# 6) 另存一份带包名和版本号的，方便直接发给别人
+$mani = [IO.File]::ReadAllText("$PROJ\AndroidManifest.xml")
+$m = [regex]::Match($mani, 'package="([^"]+)"')
+$v = [regex]::Match($mani, 'android:versionName="([^"]+)"')
+if ($m.Success -and $v.Success) {
+    $named = "$PROJ\$($m.Groups[1].Value)_$($v.Groups[1].Value).apk"
+    Copy-Item -LiteralPath $APK -Destination $named -Force
+    Get-Item -LiteralPath $named | Select-Object Name, Length
+}
