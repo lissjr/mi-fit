@@ -1,0 +1,16 @@
+# 构建产物
+build/
+*.apk
+*.idsig
+*.log
+
+# 签名
+*.jks
+release.keystore
+
+# 本地配置
+local.properties
+
+# 系统
+.DS_Store
+Thumbs.db
