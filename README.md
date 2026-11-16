@@ -32,9 +32,9 @@
 | `step_record`                   | 步数，分钟级区间值                  |
 | `spo2_record` / `stress_record` | 血氧、压力                      |
 | `weight_item_record`            | 称重记录，体重体脂肌肉量               |
-| `training_load_record`          | 每日训练负荷                     |
+| `训练负荷记录`          | 每日训练负荷                     |
 
-App 用 root 直接读这些文件，按 SQLite 页结构自己解析（不依赖 sqlite3 命令行），再按 FIT 协议编码成 `.fit` 二进制。
+App 使用 root 直接读取这些文件，按 SQLite 页结构自行解析（不依赖 sqlite3 命令行），再按 FIT 协议编码成 `.fit` 二进制。
 
 写入佳明走 `upload-service/upload/.fit`：活动文件直接传，生理数据用 `weight_scale` 消息，佳明会识别成体脂秤数据。
 
@@ -104,7 +104,3 @@ $env:ANDROID_HOME = "C:\Android\Sdk"
 ## 免责
 
 个人项目，与小米、佳明均无关联。数据结构来自对本地库的观察，系统升级后可能失效。读的是你自己的数据，请自行判断风险。
-
-## License
-
-MIT
