@@ -16,7 +16,7 @@
 
 
 
-* `databases/2203130080/cn/fitness_data` —— 主库，67 张表
+* `databases/<账号ID>/cn/fitness_data` —— 主库，67 张表，账号目录按手机上的实际目录自动识别
 
 * `files/fitness` —— 活动文件，逐点轨迹和心率采样按场次存放
 

@@ -708,7 +708,10 @@ public class MainActivity extends Activity {
                 }
                 try {
                     long tb0 = System.currentTimeMillis();
-                    Db db = new Db(sh, Server.DB_PRIVATE);
+                    String dbPath = Server.dbPrivate(sh);
+                    if (sh.size(dbPath) <= 0)
+                        throw new Exception("没找到小米运动健康的数据库，请确认已安装并登录过小米运动健康");
+                    Db db = new Db(sh, dbPath);
                     db.open();
                     long tb1 = System.currentTimeMillis();
 
@@ -836,8 +839,7 @@ public class MainActivity extends Activity {
                     });
                 } catch (final Exception e) {
                     final String diag = sh.ready()
-                            ? sh.raw("echo id=$(id); echo se=$(cat /proc/self/attr/current); ls -l " +
-                              Server.DB_PRIVATE + " 2>&1")
+                            ? sh.raw("echo id=$(id); echo se=$(cat /proc/self/attr/current); ls -l /data/data/com.mi.health/databases/ 2>&1")
                             : "(shell 未就绪)";
                     ui.post(new Runnable() {
                         public void run() { sub.setText("读取失败：" + e.getMessage() + "\n" + diag); }
