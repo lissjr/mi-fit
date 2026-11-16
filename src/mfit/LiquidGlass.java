@@ -52,8 +52,8 @@ public class LiquidGlass extends FrameLayout {
 
     private float radiusPx = 0;
     private float blurDp = 16f;
-    private int tintTop = 0x9AFFFFFF;
-    private int tintBottom = 0x82F3F8FF;
+    private int tintTop = 0xF8FFFFFF;
+    private int tintBottom = 0xF1F5F9FE;
     private int avgColor = 0xFFF4F8FD;
 
     private Bitmap shot;
@@ -65,6 +65,7 @@ public class LiquidGlass extends FrameLayout {
     private long lastCapture = 0;
     private boolean capturing = false;
     private boolean ready = false;
+    private boolean hasBg = false;   // 抓到的背景图里是否有内容，空图就当抓取失败
     private boolean resumePosted = false;
 
     // ---- API 33+ 用 AGSL 做真正的边缘折射（参考 Kyant0/AndroidLiquidGlass 的做法）----
@@ -285,6 +286,7 @@ public class LiquidGlass extends FrameLayout {
             }
         }
         if (n > 0) avgColor = Color.rgb((int) (r / n), (int) (g / n), (int) (bl / n));
+        hasBg = n > 32;      // 采样点太少说明这一帧根本没抓到内容
     }
 
     /** 6×5 采样哈希：背景没变就不重画 */
@@ -384,7 +386,7 @@ public class LiquidGlass extends FrameLayout {
             matDirty = false;
         }
         // API 33+：背景交给 AGSL 做边缘折射，材质（染色/高光/边）再叠在上面
-        if (agslOk && shader != null && node != null && shot != null && ready) {
+        if (agslOk && hasBg && shader != null && node != null && shot != null && ready) {
             float r = radiusPx > 0 ? Math.min(radiusPx, Math.min(w, h) / 2f) : 0;
             int hw = Math.max(1, w / 2), hh = Math.max(1, h / 2);
             shader.setFloatUniform("sz", (float) hw, (float) hh);
@@ -413,6 +415,9 @@ public class LiquidGlass extends FrameLayout {
 
         canvas.save();
         canvas.clipPath(clip);
+
+        // 0) 兜底底色：抓不到背景时玻璃会变成全透明，底下的文字就直接透上来了
+        if (!hasBg) canvas.drawColor(0xF2F8FAFD);
 
         // 1) 透过来的模糊背景（AGSL 路径下背景由 shader 提供，这里不再画）
         boolean agsl = agslOk && node != null;

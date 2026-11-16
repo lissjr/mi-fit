@@ -174,6 +174,7 @@ public class Db {
             return out;
         }
         int local = minLocal + ((len - minLocal) % (usable - 4));
+        if (local > maxLocal) local = minLocal;   // 算出的本地段超过单页上限时回退到最小段
         byte[] out = new byte[len];
         int copy = Math.min(local, Math.max(0, cell.length - off));
         System.arraycopy(cell, off, out, 0, copy);
