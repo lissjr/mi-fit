@@ -677,7 +677,7 @@ public class MainActivity extends Activity {
                     loading = false;
                     ui.post(new Runnable() {
                         public void run() {
-                            sub.setText("拿不到 root：需要 Magisk/KernelSU 授权才能直读小米运动健康的数据库");
+                            sub.setText(Server.why(sh));
                         }
                     });
                     return;

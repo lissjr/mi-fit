@@ -92,8 +92,14 @@ public class Server {
 
     /** 给用户看的一句话诊断，不把 dd / ls 原文怼到界面上 */
     public static synchronized String why(RootShell sh) {
-        if (sh == null || !sh.ready())
+        if (sh == null || !sh.ready()) {
+            String f = RootShell.fail();
+            if ("auth".equals(f)) return "root 授权框还没点：在 Magisk / KernelSU 的弹窗里点“允许”，再重进一次 App";
+            if ("deny".equals(f)) return "root 被拒：到 KernelSU / Magisk 里把这个 App 改成“允许”（刚装上或换了手机会要重新授权一次）";
+            if ("nosu".equals(f)) return "这台手机没找到 su：确认已经 root，并在 root 管理器里给这个 App 授权";
             return "root 没起来：到 root 管理器（Magisk / KernelSU）里给本 App 授权，已授权就重启手机再试";
+        }
+        if (!sh.pkgVisible()) return "root 拿到了，但看不到小米运动健康的数据目录：重启手机再打开一次；还不行就到 root 管理器里关掉对本 App 的挂载隔离";
         String pkg = sh.raw("ls -d /data/data/" + PKG + " /data/user/*/" + PKG + " 2>&1");
         if (pkg.contains("Permission denied")) return "权限不足：到 root 管理器给本 App 授权";
         if (!pkg.contains("/" + PKG)) return "这台手机没装小米运动健康";

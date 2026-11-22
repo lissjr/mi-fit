@@ -36,8 +36,15 @@ public class RootShell {
         }
     }
 
+    /** 上一次授权失败的类型，给界面翻译成人话；同时用于短时间内不再重复弹授权框 */
+    private static volatile String fail = "";
+    private static volatile long failAt = 0;
+    public static String fail() { return fail; }
+
     public synchronized boolean start(Context ctx) {
         if (ok) return true;
+        // 刚被拒过就别再连着要：Magisk 的授权框一秒能弹好几个，KernelSU 也会连刷拒绝
+        if (fail.length() > 0 && android.os.SystemClock.elapsedRealtime() - failAt < 60000) return false;
         try {
             tmp = new File(ctx.getFilesDir(), "cache");
             if (!tmp.exists()) tmp.mkdirs();
@@ -45,32 +52,88 @@ public class RootShell {
             return false;
         }
         // App 进程的挂载命名空间里看不到小米运动健康的数据目录（被 Magisk 隔离），
-        // 逐个尝试进入全局命名空间的启动方式，直到能读到目标目录。
-        String[][] cands = new String[][]{
-                {"su", "--mount-master", "-c", "sh"},
-                {"su", "-c", "/system/bin/nsenter -t 1 -m -- sh"},
-                {"su", "-c", "sh"}
+        // 逐个尝试能进入全局命名空间的启动方式；su 的安装路径也逐个试（Magisk / KernelSU / APatch）。
+        String[] suPaths = {"su", "/product/bin/su", "/debug_ramdisk/su", "/system/bin/su",
+                "/data/adb/ksu/bin/su", "/system/xbin/su"};
+        String[][] tails = {
+                {"--mount-master", "-c", "sh"},
+                {"-c", "/system/bin/nsenter -t 1 -m -- sh"},
+                {"-c", "sh"}
         };
-        for (String[] c : cands) {
-            try {
-                close();
-                p = new ProcessBuilder(c).redirectErrorStream(false).start();
-                in = new OutputStreamWriter(p.getOutputStream(), "UTF-8");
-                out = new BufferedReader(new InputStreamReader(p.getInputStream(), "UTF-8"));
-                String probe = cmd("( ls /data/data/com.mi.health >/dev/null 2>&1 || ls -d /data/user/*/com.mi.health >/dev/null 2>&1 ) && echo :ok:");
-                if (probe != null && probe.contains(":ok:")) {
-                    ok = true;
-                    mode = android.text.TextUtils.join(" ", c);
-                    return true;
+        android.util.Log.i("mfit", "root PATH=" + System.getenv("PATH"));
+        String goodSu = null;      // 某个路径真能起进程后只用它，免得反复弹授权框
+        boolean sawRoot = false;   // su 确实给到了 root，只是没看见库目录
+        String sawMode = null;
+        String why = "";
+        outer:
+        for (String[] t : tails) {
+            String[] suList = goodSu == null ? suPaths : new String[]{goodSu};
+            for (String su : suList) {
+                String[] c = new String[t.length + 1];
+                c[0] = su;
+                System.arraycopy(t, 0, c, 1, t.length);
+                String tag = android.text.TextUtils.join(" ", c);
+                try {
+                    close();
+                    p = new ProcessBuilder(c).redirectErrorStream(true).start();
+                    in = new OutputStreamWriter(p.getOutputStream(), "UTF-8");
+                    out = new BufferedReader(new InputStreamReader(p.getInputStream(), "UTF-8"));
+                    goodSu = su;
+                    String probe = probeT("id; ( test -d /data/data/" + Server.PKG
+                            + " || ls -d /data/user/*/" + Server.PKG + " >/dev/null 2>&1 ) && echo :ok:", 6000);
+                    if (probe == null) {
+                        // 授权框弹出来没人点：su 本身是好的，换启动方式也不会变好，直接收手
+                        why = "auth";
+                        android.util.Log.i("mfit", "root try [" + tag + "] 超时（授权框没点）");
+                        try { p.destroyForcibly(); } catch (Exception ignored) {}
+                        break outer;
+                    }
+                    android.util.Log.i("mfit", "root try [" + tag + "] -> " + probe.replace('\n', ' ').trim());
+                    if (probe.contains(":ok:")) {
+                        ok = true;
+                        mode = tag;
+                        fail = "";
+                        failAt = 0;
+                        return true;
+                    }
+                    if (probe.contains("uid=0")) {
+                        // su 给了 root，只是这个视图里看不到小米健康：记下来换个启动方式再试
+                        sawRoot = true;
+                        sawMode = tag;
+                        break;      // 同一个 su 换 tail
+                    }
+                    if (probe.toLowerCase().contains("permission denied")
+                            || probe.toLowerCase().contains("denied")
+                            || probe.toLowerCase().contains("not allowed")) {
+                        why = "deny";   // su 被拒：root 管理器里没给这个 App 授权
+                        android.util.Log.i("mfit", "root try [" + tag + "] 被拒，停手");
+                        break outer;
+                    }
+                    why = "nosu";
+                } catch (Exception e) {
+                    android.util.Log.i("mfit", "root try [" + tag + "] ERR " + e);
+                    why = "nosu";
                 }
-            } catch (Exception e) {
-                // 试下一种
             }
         }
         close();
+        if (sawRoot) {
+            // su 是通的，只是没找到库目录：让上层按“没库”处理，比报“拿不到 root”准确
+            ok = true;
+            mode = sawMode;
+            pkgVisible = false;
+            fail = "";
+            failAt = 0;
+            return true;
+        }
         ok = false;
+        fail = why.length() == 0 ? "nosu" : why;
+        failAt = android.os.SystemClock.elapsedRealtime();
         return false;
     }
+
+    private boolean pkgVisible = true;
+    public boolean pkgVisible() { return pkgVisible; }
 
     private String mode = "";
     public String mode() { return mode; }
@@ -101,6 +164,23 @@ public class RootShell {
         } catch (Exception e) {
             return null;
         }
+    }
+
+    /** 带超时的探测：su 正在等授权框时不会回话，不能让整页加载一直卡着 */
+    private String probeT(final String c, long ms) {
+        final String[] res = new String[1];
+        final boolean[] done = new boolean[1];
+        Thread t = new Thread(new Runnable() {
+            public void run() {
+                try { res[0] = cmd(c); } catch (Throwable ignored) {}
+                done[0] = true;
+            }
+        });
+        t.setDaemon(true);
+        t.start();
+        try { t.join(ms); } catch (InterruptedException ignored) {}
+        if (!done[0]) return null;
+        return res[0];
     }
 
     /** 让 root 把 [off, off+len) 写到 cache/slice.bin，然后读回来 */
