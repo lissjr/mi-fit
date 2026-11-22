@@ -14,9 +14,11 @@ public class TrackIdx {
 
     public static Map<Long, File2> scan(RootShell sh) {
         Map<Long, File2> out = new HashMap<Long, File2>();
-        String r = sh.find(Server.TRK_PRIVATE + " -type f -path '*/sport/*' -name '*_record'");
+        String root = Server.trkPrivate(sh);        // 轨迹目录也现场找，别写死
+        if (root == null || root.length() == 0) return out;
+        String r = sh.find("'" + root + "' -type f -name '*_record'");
         if (r == null) return out;
-        String prefix = Server.TRK_PRIVATE + "/";
+        String prefix = root + "/";
         for (String line : r.split("\n")) {
             line = line.trim();
             if (!line.endsWith("_record") || line.contains("/daily/")) continue;

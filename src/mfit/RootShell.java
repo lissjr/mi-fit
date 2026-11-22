@@ -57,7 +57,7 @@ public class RootShell {
                 p = new ProcessBuilder(c).redirectErrorStream(false).start();
                 in = new OutputStreamWriter(p.getOutputStream(), "UTF-8");
                 out = new BufferedReader(new InputStreamReader(p.getInputStream(), "UTF-8"));
-                String probe = cmd("ls /data/data/com.mi.health >/dev/null 2>&1 && echo :ok:");
+                String probe = cmd("( ls /data/data/com.mi.health >/dev/null 2>&1 || ls -d /data/user/*/com.mi.health >/dev/null 2>&1 ) && echo :ok:");
                 if (probe != null && probe.contains(":ok:")) {
                     ok = true;
                     mode = android.text.TextUtils.join(" ", c);
@@ -115,7 +115,9 @@ public class RootShell {
         String out = cmd("/system/bin/dd if='" + path + "' of='" + f.getAbsolutePath() + "' bs=" + bs +
                 " skip=" + skip + " count=" + cnt + " 2>&1; echo rc=$?");
         if (!f.exists() || f.length() == 0) {
-            throw new Exception("dd 失败 @" + off + " [" + String.valueOf(out).replace('\n', ' ') + "]");
+            // dd 原文只进 logcat，界面由上层用 Server.why 说明原因
+            android.util.Log.i("mfit", "dd fail @" + off + " [" + String.valueOf(out).replace('\n', ' ') + "]");
+            throw new Exception("库文件没读出来");
         }
         byte[] b = new byte[(int) f.length()];
         java.io.FileInputStream fis = new java.io.FileInputStream(f);

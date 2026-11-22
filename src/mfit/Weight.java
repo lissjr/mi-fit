@@ -36,7 +36,9 @@ public class Weight {
     private static boolean readInto(Weight w, RootShell sh) {
         if (sh == null) return false;
         try {
-            Db db = new Db(sh, Server.dbPrivate(sh));
+            String p = Server.dbPrivate(sh);
+            if (p.length() == 0) return false;
+            Db db = new Db(sh, p);
             List<Map<String, Object>> rows = db.readTableObjects("weight_item_record");
             w.list.clear();
             for (Map<String, Object> row : rows) {

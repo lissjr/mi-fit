@@ -183,10 +183,11 @@ public class DetailActivity extends Activity {
                         t = Track.analyze(rec, gps);
                         kinfo = Weight.cached(ctx, sh).at(r.start);
                     } else {
-                        err = "拿不到 root";
+                        err = "本机这次记录要读手机里的轨迹，先到 root 管理器给 FitLink 授权";
                     }
                 } catch (Exception e) {
-                    err = e.getMessage();
+                    android.util.Log.i("mfit", "track fail " + e);
+                    err = "这一场的轨迹文件没读出来";
                 }
                 final Track ft = t;
                 final String ferr = err;
@@ -194,7 +195,7 @@ public class DetailActivity extends Activity {
                 ui.post(new Runnable() {
                     public void run() {
                         if (ft == null || !ft.selfTest) {
-                            trackStatus.setText("解码失败：" + (ferr == null ? "这一场的轨迹文件读不到内容" : ferr));
+                            trackStatus.setText("轨迹没画出来：" + (ferr == null ? "这一场的轨迹文件读不到内容" : ferr));
                             return;
                         }
                         track = ft;

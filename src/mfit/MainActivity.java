@@ -709,8 +709,8 @@ public class MainActivity extends Activity {
                 try {
                     long tb0 = System.currentTimeMillis();
                     String dbPath = Server.dbPrivate(sh);
-                    if (sh.size(dbPath) <= 0)
-                        throw new Exception("没找到小米运动健康的数据库，请确认已安装并登录过小米运动健康");
+                    if (dbPath.length() == 0 || sh.size(dbPath) <= 0)
+                        throw new Exception(Server.why(sh));
                     Db db = new Db(sh, dbPath);
                     db.open();
                     long tb1 = System.currentTimeMillis();
@@ -838,11 +838,20 @@ public class MainActivity extends Activity {
                         }
                     });
                 } catch (final Exception e) {
-                    final String diag = sh.ready()
-                            ? sh.raw("echo id=$(id); echo se=$(cat /proc/self/attr/current); ls -l /data/data/com.mi.health/databases/ 2>&1")
-                            : "(shell 未就绪)";
+                    // 技术细节只进 logcat：库路径、dd 原文、SELinux 上下文一律不上界面
+                    String dbg;
+                    try {
+                        dbg = sh.ready()
+                                ? ("db=" + Server.dbPrivate(sh) + " | "
+                                + sh.raw("echo id=$(id); echo se=$(cat /proc/self/attr/current); ls -l " + Server.DB_DIR + "/ 2>&1"))
+                                : "(shell 未就绪)";
+                    } catch (Throwable ignored) {
+                        dbg = "(诊断也失败了)";
+                    }
+                    android.util.Log.i("mfit", "local fail: " + e + " | " + dbg.replace('\n', ' '));
+                    final String why = Server.why(sh);
                     ui.post(new Runnable() {
-                        public void run() { sub.setText("读取失败：" + e.getMessage() + "\n" + diag); }
+                        public void run() { sub.setText(why); }
                     });
                 } finally {
                     loading = false;
